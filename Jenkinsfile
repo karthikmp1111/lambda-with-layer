@@ -40,7 +40,7 @@ pipeline {
             }
             steps {
                 script {
-                    def lambdas = LAMBDA_FUNCTIONS.split(',') 
+                    def lambdas = LAMBDA_FUNCTIONS.split(',')
                     lambdas.each { lambdaName ->
                         echo "Checking for changes in ${lambdaName}"
                         // Check for changes in lambda function directory
@@ -66,7 +66,7 @@ pipeline {
             }
             steps {
                 script {
-                    def layers = LAYER_NAMES.split(',') 
+                    def layers = LAYER_NAMES.split(',')
                     layers.each { layerName ->
                         echo "Checking for changes in ${layerName}"
                         // Check for changes in layer directory
