@@ -1,7 +1,3 @@
-provider "aws" {
-  region = "us-east-1"  # Set your AWS region
-}
-
 # Create IAM Role for Lambda execution
 resource "aws_iam_role" "lambda_role" {
   name               = "bg_lambda_execution_role"
