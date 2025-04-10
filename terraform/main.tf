@@ -1,59 +1,50 @@
-locals {
-  # Define the S3 paths for the Lambda function packages
-  lambda_files = {
-    for name in var.lambda_names : name => "s3://bg-kar-terraform-state/lambda-packages/${name}/package.zip"
-  }
-
-  # Define the Lambda layers for each function
-  lambda_layers = {
-    "lambda1" = ["layer1", "layer2"]
-    "lambda2" = ["layer2", "layer3"]
-    "lambda3" = ["layer1", "layer3"]
-  }
+provider "aws" {
+  region = "us-east-1"  # Set your AWS region
 }
 
-# Fetch the Lambda function package from S3
-data "aws_s3_object" "lambda_package" {
-  for_each = local.lambda_files
-  bucket   = "bg-kar-terraform-state"
-  key      = "lambda-packages/${each.key}/package.zip"
+# Create IAM Role for Lambda execution
+resource "aws_iam_role" "lambda_role" {
+  name               = "bg_lambda_execution_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
 }
 
-# Fetch the Lambda layer packages from S3
-data "aws_s3_object" "lambda_layer" {
-  for_each = toset(flatten([for lambda, layers in local.lambda_layers : [for layer in layers : "lambda-layers/${layer}/package.zip"]]))
-
-  bucket   = "bg-kar-terraform-state"
-  key      = each.value
+# Data sources to fetch Lambda Layer zip files from S3
+data "aws_s3_object" "lambda_layer1" {
+  bucket = "bg-kar-terraform-state"  # Your S3 bucket name
+  key    = "lambda-layers/layer1/package.zip"  # Path to layer1 zip file in S3
 }
 
-# Create Lambda layers from the defined layer names
-resource "aws_lambda_layer_version" "lambda_layer" {
-  for_each = toset(flatten([for lambda, layers in local.lambda_layers : layers]))
-
-  layer_name = each.value
-  s3_bucket  = "bg-kar-terraform-state"
-  s3_key     = "lambda-layers/${each.value}/package.zip"
+data "aws_s3_object" "lambda_layer2" {
+  bucket = "bg-kar-terraform-state"
+  key    = "lambda-layers/layer2/package.zip"  # Path to layer2 zip file in S3
 }
 
-# Create Lambda functions and attach the required layers
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambda_files
+data "aws_s3_object" "lambda_layer3" {
+  bucket = "bg-kar-terraform-state"
+  key    = "lambda-layers/layer3/package.zip"  # Path to layer3 zip file in S3
+}
 
-  function_name = each.key
+# Create Lambda Function 1
+resource "aws_lambda_function" "lambda1" {
+  function_name = "lambda1"
   role          = aws_iam_role.lambda_role.arn
-  handler       = "index.lambda_handler"
-  runtime       = "python3.8"
-
-  s3_bucket = "bg-kar-terraform-state"
-  s3_key    = "lambda-packages/${each.key}/package.zip"
-
-  source_code_hash = data.aws_s3_object.lambda_package[each.key].etag
-
-  # Attach layers based on the function's layers
-  layers = flatten([for layer in local.lambda_layers[each.key] : aws_lambda_layer_version.lambda_layer[layer].arn])
-
-  publish = true
+  runtime       = "python3.8"  # Specify the Lambda runtime
+  handler       = "index.lambda_handler"  # Adjust based on your function's handler
+  memory_size   = 128
+  timeout       = 3
+  s3_bucket     = "bg-kar-terraform-state"  # Your S3 bucket name
+  s3_key        = "lambda-packages/lambda1/package.zip"  # Path to lambda1 zip in S3
 
   environment {
     variables = {
@@ -61,26 +52,94 @@ resource "aws_lambda_function" "lambda" {
     }
   }
 
-  lifecycle {
-    ignore_changes = [environment, publish]
+  layers = [
+    aws_lambda_layer_version.lambda_layer1.arn
+  ]
+}
+
+# Create Lambda Function 2
+resource "aws_lambda_function" "lambda2" {
+  function_name = "lambda2"
+  role          = aws_iam_role.lambda_role.arn
+  runtime       = "python3.8"
+  handler       = "index.lambda_handler"
+  memory_size   = 128
+  timeout       = 3
+  s3_bucket     = "bg-kar-terraform-state"
+  s3_key        = "lambda-packages/lambda2/package.zip"
+
+  environment {
+    variables = {
+      ENV = "dev"
+    }
+  }
+
+  layers = [
+    aws_lambda_layer_version.lambda_layer2.arn
+  ]
+}
+
+# Create Lambda Function 3
+resource "aws_lambda_function" "lambda3" {
+  function_name = "lambda3"
+  role          = aws_iam_role.lambda_role.arn
+  runtime       = "python3.8"
+  handler       = "index.lambda_handler"
+  memory_size   = 128
+  timeout       = 3
+  s3_bucket     = "bg-kar-terraform-state"
+  s3_key        = "lambda-packages/lambda3/package.zip"
+
+  environment {
+    variables = {
+      ENV = "dev"
+    }
+  }
+
+  layers = [
+    aws_lambda_layer_version.lambda_layer3.arn
+  ]
+}
+
+# Create Lambda Layer 1 from S3
+resource "aws_lambda_layer_version" "lambda_layer1" {
+  layer_name  = "layer1"
+  s3_bucket   = "bg-kar-terraform-state"
+  s3_key      = "lambda-layers/layer1/package.zip"
+  compatible_runtimes = ["python3.8"]
+}
+
+# Create Lambda Layer 2 from S3
+resource "aws_lambda_layer_version" "lambda_layer2" {
+  layer_name  = "layer2"
+  s3_bucket   = "bg-kar-terraform-state"
+  s3_key      = "lambda-layers/layer2/package.zip"
+  compatible_runtimes = ["python3.8"]
+}
+
+# Create Lambda Layer 3 from S3
+resource "aws_lambda_layer_version" "lambda_layer3" {
+  layer_name  = "layer3"
+  s3_bucket   = "bg-kar-terraform-state"
+  s3_key      = "lambda-layers/layer3/package.zip"
+  compatible_runtimes = ["python3.8"]
+}
+
+# Output the ARNs of Lambda Functions
+output "lambda_arns" {
+  value = {
+    lambda1 = aws_lambda_function.lambda1.arn
+    lambda2 = aws_lambda_function.lambda2.arn
+    lambda3 = aws_lambda_function.lambda3.arn
   }
 }
 
-# Create the IAM role for Lambda execution
-resource "aws_iam_role" "lambda_role" {
-  name = "bg_lambda_execution_role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
-  })
-
-  lifecycle {
-    ignore_changes = [name]
+# Output the versions of Lambda Functions
+output "lambda_versions" {
+  value = {
+    lambda1 = aws_lambda_function.lambda1.version
+    lambda2 = aws_lambda_function.lambda2.version
+    lambda3 = aws_lambda_function.lambda3.version
   }
 }
 
