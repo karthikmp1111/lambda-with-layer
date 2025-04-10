@@ -15,32 +15,40 @@ resource "aws_iam_role" "lambda_role" {
   })
 }
 
-# Data sources to fetch Lambda Layer zip files from S3
-data "aws_s3_object" "lambda_layer1" {
-  bucket = "bg-kar-terraform-state"  # Your S3 bucket name
-  key    = "lambda-layers/layer1/package.zip"  # Path to layer1 zip file in S3
+# Create Lambda Layer 1 from S3
+resource "aws_lambda_layer_version" "lambda_layer1" {
+  layer_name  = "layer1"
+  s3_bucket   = "bg-kar-terraform-state"
+  s3_key      = "lambda-layers/layer1/package.zip"
+  compatible_runtimes = ["python3.8"]
 }
 
-data "aws_s3_object" "lambda_layer2" {
-  bucket = "bg-kar-terraform-state"
-  key    = "lambda-layers/layer2/package.zip"  # Path to layer2 zip file in S3
+# Create Lambda Layer 2 from S3
+resource "aws_lambda_layer_version" "lambda_layer2" {
+  layer_name  = "layer2"
+  s3_bucket   = "bg-kar-terraform-state"
+  s3_key      = "lambda-layers/layer2/package.zip"
+  compatible_runtimes = ["python3.8"]
 }
 
-data "aws_s3_object" "lambda_layer3" {
-  bucket = "bg-kar-terraform-state"
-  key    = "lambda-layers/layer3/package.zip"  # Path to layer3 zip file in S3
+# Create Lambda Layer 3 from S3
+resource "aws_lambda_layer_version" "lambda_layer3" {
+  layer_name  = "layer3"
+  s3_bucket   = "bg-kar-terraform-state"
+  s3_key      = "lambda-layers/layer3/package.zip"
+  compatible_runtimes = ["python3.8"]
 }
 
 # Create Lambda Function 1
 resource "aws_lambda_function" "lambda1" {
   function_name = "lambda1"
   role          = aws_iam_role.lambda_role.arn
-  runtime       = "python3.8"  # Specify the Lambda runtime
-  handler       = "index.lambda_handler"  # Adjust based on your function's handler
+  runtime       = "python3.8"
+  handler       = "index.lambda_handler"
   memory_size   = 128
   timeout       = 3
-  s3_bucket     = "bg-kar-terraform-state"  # Your S3 bucket name
-  s3_key        = "lambda-packages/lambda1/package.zip"  # Path to lambda1 zip in S3
+  s3_bucket     = "bg-kar-terraform-state"
+  s3_key        = "lambda-packages/lambda1/package.zip"
 
   environment {
     variables = {
@@ -97,30 +105,6 @@ resource "aws_lambda_function" "lambda3" {
   ]
 }
 
-# Create Lambda Layer 1 from S3
-resource "aws_lambda_layer_version" "lambda_layer1" {
-  layer_name  = "layer1"
-  s3_bucket   = "bg-kar-terraform-state"
-  s3_key      = "lambda-layers/layer1/package.zip"
-  compatible_runtimes = ["python3.8"]
-}
-
-# Create Lambda Layer 2 from S3
-resource "aws_lambda_layer_version" "lambda_layer2" {
-  layer_name  = "layer2"
-  s3_bucket   = "bg-kar-terraform-state"
-  s3_key      = "lambda-layers/layer2/package.zip"
-  compatible_runtimes = ["python3.8"]
-}
-
-# Create Lambda Layer 3 from S3
-resource "aws_lambda_layer_version" "lambda_layer3" {
-  layer_name  = "layer3"
-  s3_bucket   = "bg-kar-terraform-state"
-  s3_key      = "lambda-layers/layer3/package.zip"
-  compatible_runtimes = ["python3.8"]
-}
-
 # Output the ARNs of Lambda Functions
 output "lambda_arns" {
   value = {
@@ -138,6 +122,7 @@ output "lambda_versions" {
     lambda3 = aws_lambda_function.lambda3.version
   }
 }
+
 
 ########Test File###########
 # resource "aws_s3_bucket_object" "test_file" {
