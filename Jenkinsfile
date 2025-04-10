@@ -5,6 +5,7 @@ pipeline {
         AWS_REGION = 'us-west-1'
         S3_BUCKET = 'bg-kar-terraform-state'
         LAMBDA_FUNCTIONS = "lambda1,lambda2,lambda3"
+        LAYER_NAMES = "layer1,layer2,layer3"
     }
 
     parameters {
@@ -41,9 +42,15 @@ pipeline {
                 script {
                     def lambdas = LAMBDA_FUNCTIONS.split(',') 
                     lambdas.each { lambdaName ->
-                        if (sh(script: "git diff --quiet HEAD~1 lambda-functions/${lambdaName}", returnStatus: true) != 0) {
+                        echo "Checking for changes in ${lambdaName}"
+                        // Check for changes in lambda function directory
+                        def hasChanges = sh(script: "git diff --quiet HEAD~1 lambda-functions/${lambdaName}", returnStatus: true)
+                        
+                        if (hasChanges != 0) {
                             echo "Changes detected for ${lambdaName}, building and uploading..."
+                            // Build the Lambda package
                             sh "bash lambda-functions/${lambdaName}/build.sh"
+                            // Upload the built Lambda package to S3
                             sh "aws s3 cp lambda-functions/${lambdaName}/package.zip s3://$S3_BUCKET/lambda-packages/${lambdaName}/package.zip"
                         } else {
                             echo "No changes detected in ${lambdaName}, skipping build and upload."
@@ -59,11 +66,17 @@ pipeline {
             }
             steps {
                 script {
-                    def layers = ["layer1", "layer2", "layer3"]
+                    def layers = LAYER_NAMES.split(',') 
                     layers.each { layerName ->
-                        if (sh(script: "git diff --quiet HEAD~1 lambda-layers/${layerName}", returnStatus: true) != 0) {
+                        echo "Checking for changes in ${layerName}"
+                        // Check for changes in layer directory
+                        def hasChanges = sh(script: "git diff --quiet HEAD~1 lambda-layers/${layerName}", returnStatus: true)
+                        
+                        if (hasChanges != 0) {
                             echo "Changes detected for ${layerName}, building and uploading..."
+                            // Build the Layer package
                             sh "bash lambda-layers/${layerName}/build-${layerName}.sh"
+                            // Upload the built Layer package to S3
                             sh "aws s3 cp lambda-layers/${layerName}/package.zip s3://$S3_BUCKET/lambda-layers/${layerName}/package.zip"
                         } else {
                             echo "No changes detected in ${layerName}, skipping build and upload."
