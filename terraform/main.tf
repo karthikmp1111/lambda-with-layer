@@ -21,7 +21,8 @@ data "aws_s3_object" "lambda_package" {
 
 # Fetch the Lambda layer packages from S3
 data "aws_s3_object" "lambda_layer" {
-  for_each = toset(flatten([for lambda, layers in local.lambda_layers : [for layer in layers : "s3://bg-kar-terraform-state/lambda-layers/${layer}/package.zip"]]))
+  for_each = toset(flatten([for lambda, layers in local.lambda_layers : [for layer in layers : "lambda-layers/${layer}/package.zip"]]))
+
   bucket   = "bg-kar-terraform-state"
   key      = each.value
 }
