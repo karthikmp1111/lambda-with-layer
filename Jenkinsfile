@@ -43,7 +43,7 @@ pipeline {
                     def layers = LAYERS.split(',')
                     layers.each { layer ->
                         def layerPath = "lambda-layers/${layer}"
-                        if (sh(script: "git diff --quiet HEAD~1 ${layerPath}", returnStatus: true) != 0) {
+                        if (sh(script: "git diff --quiet origin/main -- ${layerPath}", returnStatus: true) != 0) {
                             echo "Changes detected in ${layer}, building and uploading..."
                             sh "bash ${layerPath}/build.sh"
                             sh "aws s3 cp ${layerPath}/layer.zip s3://${S3_BUCKET}/lambda-layers/${layer}/layer.zip"
