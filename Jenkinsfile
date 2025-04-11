@@ -40,12 +40,18 @@ pipeline {
             }
             steps {
                 script {
+                    sh "git fetch origin main"
                     def layers = LAYERS.split(',')
                     layers.each { layerName ->
-                        if (sh(script: "git diff --quiet HEAD~1 lambda-layers/${layerName}", returnStatus: true) != 0) {
+                        def diffCmd = "git diff --quiet origin/main lambda-layers/${layerName}"
+                        if (sh(script: diffCmd, returnStatus: true) != 0) {
                             echo "Changes detected in ${layerName}, building..."
-                            sh "bash lambda-layers/${layerName}/build.sh"
-                            sh "aws s3 cp lambda-layers/${layerName}/layer.zip s3://$S3_BUCKET/lambda-layers/${layerName}/layer.zip"
+                            try {
+                                sh "bash lambda-layers/${layerName}/build.sh"
+                                sh "aws s3 cp lambda-layers/${layerName}/layer.zip s3://$S3_BUCKET/lambda-layers/${layerName}/layer.zip"
+                            } catch (err) {
+                                error "Failed to build/upload ${layerName}: ${err}"
+                            }
                         } else {
                             echo "No changes in ${layerName}"
                         }
@@ -62,10 +68,15 @@ pipeline {
                 script {
                     def lambdas = LAMBDA_FUNCTIONS.split(',')
                     lambdas.each { lambdaName ->
-                        if (sh(script: "git diff --quiet HEAD~1 lambda-functions/${lambdaName}", returnStatus: true) != 0) {
+                        def diffCmd = "git diff --quiet origin/main lambda-functions/${lambdaName}"
+                        if (sh(script: diffCmd, returnStatus: true) != 0) {
                             echo "Changes detected for ${lambdaName}, building..."
-                            sh "bash lambda-functions/${lambdaName}/build.sh"
-                            sh "aws s3 cp lambda-functions/${lambdaName}/package.zip s3://$S3_BUCKET/lambda-packages/${lambdaName}/package.zip"
+                            try {
+                                sh "bash lambda-functions/${lambdaName}/build.sh"
+                                sh "aws s3 cp lambda-functions/${lambdaName}/package.zip s3://$S3_BUCKET/lambda-packages/${lambdaName}/package.zip"
+                            } catch (err) {
+                                error "Failed to build/upload ${lambdaName}: ${err}"
+                            }
                         } else {
                             echo "No changes in ${lambdaName}"
                         }
@@ -96,7 +107,7 @@ pipeline {
             }
             steps {
                 dir('terraform') {
-                    sh 'terraform apply -auto-approve'
+                    sh 'terraform apply -auto-approve tfplan'
                 }
             }
         }
@@ -119,5 +130,3 @@ pipeline {
         }
     }
 }
-
-
