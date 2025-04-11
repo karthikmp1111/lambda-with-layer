@@ -1,10 +1,16 @@
 #!/bin/bash
 set -e
 
-LAYER_NAME=$(basename "$PWD")
-echo "Building $LAYER_NAME..."
+echo "Building lambda-layer..."
 
 mkdir -p python
-pip install -r requirements.txt -t python/
-zip -r layer.zip python/ -x "*.pyc" "__pycache__/*"
-echo "✅ Layer $LAYER_NAME built."
+
+# Only install requirements if requirements.txt exists
+if [ -f "requirements.txt" ]; then
+    pip install -r requirements.txt -t python
+else
+    echo "No requirements.txt found, skipping pip install"
+fi
+
+zip -r layer.zip python
+
