@@ -13,6 +13,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout Code') {
             steps {
                 git branch: 'main', url: 'https://github.com/karthikmp1111/lambda-with-layer.git'
@@ -26,9 +27,13 @@ pipeline {
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_KEY')
                 ]) {
                     sh '''
-                        aws configure set aws_access_key_id $AWS_ACCESS_KEY
-                        aws configure set aws_secret_access_key $AWS_SECRET_KEY
-                        aws configure set region $AWS_REGION
+                        mkdir -p ~/.aws
+                        cat > ~/.aws/credentials <<-EOL
+                        [default]
+                        aws_access_key_id=$AWS_ACCESS_KEY
+                        aws_secret_access_key=$AWS_SECRET_KEY
+                        region=$AWS_REGION
+                        EOL
                     '''
                 }
             }
@@ -40,16 +45,16 @@ pipeline {
             }
             steps {
                 script {
-                    sh "git fetch origin main"
                     def layers = LAYERS.split(',')
                     layers.each { layerName ->
-                        def diffCmd = "git diff --quiet origin/main lambda-layers/${layerName}"
+                        def layerPath = "lambda-layers/${layerName}"
+                        def diffCmd = "git diff --quiet origin/main ${layerPath}"
                         if (sh(script: diffCmd, returnStatus: true) != 0) {
-                            echo "Changes detected in ${layerName}, building..."
+                            echo "Changes detected in ${layerName}, building and uploading..."
                             try {
-                                sh "bash lambda-layers/${layerName}/build.sh"
-                                sh "aws s3 cp lambda-layers/${layerName}/layer.zip s3://$S3_BUCKET/lambda-layers/${layerName}/layer.zip"
-                            } catch (err) {
+                                sh "bash ${layerPath}/build.sh"
+                                sh "aws s3 cp ${layerPath}/layer.zip s3://${S3_BUCKET}/lambda-layers/${layerName}/layer.zip"
+                            } catch (Exception err) {
                                 error "Failed to build/upload ${layerName}: ${err}"
                             }
                         } else {
@@ -68,13 +73,14 @@ pipeline {
                 script {
                     def lambdas = LAMBDA_FUNCTIONS.split(',')
                     lambdas.each { lambdaName ->
-                        def diffCmd = "git diff --quiet origin/main lambda-functions/${lambdaName}"
+                        def lambdaPath = "lambda-functions/${lambdaName}"
+                        def diffCmd = "git diff --quiet origin/main ${lambdaPath}"
                         if (sh(script: diffCmd, returnStatus: true) != 0) {
-                            echo "Changes detected for ${lambdaName}, building..."
+                            echo "Changes detected in ${lambdaName}, building and uploading..."
                             try {
-                                sh "bash lambda-functions/${lambdaName}/build.sh"
-                                sh "aws s3 cp lambda-functions/${lambdaName}/package.zip s3://$S3_BUCKET/lambda-packages/${lambdaName}/package.zip"
-                            } catch (err) {
+                                sh "bash ${lambdaPath}/build.sh"
+                                sh "aws s3 cp ${lambdaPath}/package.zip s3://${S3_BUCKET}/lambda-packages/${lambdaName}/package.zip"
+                            } catch (Exception err) {
                                 error "Failed to build/upload ${lambdaName}: ${err}"
                             }
                         } else {
