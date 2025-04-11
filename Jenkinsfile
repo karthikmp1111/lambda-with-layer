@@ -5,17 +5,17 @@ pipeline {
         AWS_REGION = 'us-west-1'
         S3_BUCKET = 'bg-kar-terraform-state'
         LAMBDA_FUNCTIONS = "lambda1,lambda2,lambda3"
-        LAYER_NAMES = "layer1,layer2,layer3"
+        LAYERS = "layer1,layer2,layer3"
     }
 
     parameters {
-        choice(name: 'APPLY_OR_DESTROY', choices: ['apply', 'destroy'], description: 'Choose whether to apply or destroy Terraform resources')
+        choice(name: 'APPLY_OR_DESTROY', choices: ['apply', 'destroy'], description: 'Apply or Destroy')
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'main', url: 'https://github.com/karthikmp1111/lambda-with-layer.git'
+                git branch: 'main', url: 'https://github.com/karthikmp1111/multi-lambda.git'
             }
         }
 
@@ -26,60 +26,48 @@ pipeline {
                     string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'AWS_SECRET_KEY')
                 ]) {
                     sh '''
-                    aws configure set aws_access_key_id $AWS_ACCESS_KEY
-                    aws configure set aws_secret_access_key $AWS_SECRET_KEY
-                    aws configure set region $AWS_REGION
+                        aws configure set aws_access_key_id $AWS_ACCESS_KEY
+                        aws configure set aws_secret_access_key $AWS_SECRET_KEY
+                        aws configure set region $AWS_REGION
                     '''
                 }
             }
         }
 
-        stage('Build and Upload Lambda Packages') {
+        stage('Build & Upload Layers') {
             when {
                 expression { params.APPLY_OR_DESTROY == 'apply' }
             }
             steps {
                 script {
-                    def lambdas = LAMBDA_FUNCTIONS.split(',') 
-                    lambdas.each { lambdaName ->
-                        echo "Checking for changes in ${lambdaName}"
-                        // Check for changes in lambda function directory
-                        def hasChanges = sh(script: "git diff --quiet HEAD~1 lambda-functions/${lambdaName}", returnStatus: true)
-                        
-                        if (hasChanges != 0) {
-                            echo "Changes detected for ${lambdaName}, building and uploading..."
-                            // Build the Lambda package
-                            sh "bash lambda-functions/${lambdaName}/build.sh"
-                            // Upload the built Lambda package to S3
-                            sh "aws s3 cp lambda-functions/${lambdaName}/package.zip s3://$S3_BUCKET/lambda-packages/${lambdaName}/package.zip"
+                    def layers = LAYERS.split(',')
+                    layers.each { layerName ->
+                        if (sh(script: "git diff --quiet HEAD~1 lambda-layers/${layerName}", returnStatus: true) != 0) {
+                            echo "Changes detected in ${layerName}, building..."
+                            sh "bash lambda-layers/${layerName}/build.sh"
+                            sh "aws s3 cp lambda-layers/${layerName}/layer.zip s3://$S3_BUCKET/lambda-layers/${layerName}/layer.zip"
                         } else {
-                            echo "No changes detected in ${lambdaName}, skipping build and upload."
+                            echo "No changes in ${layerName}"
                         }
                     }
                 }
             }
         }
 
-        stage('Build and Upload Layer Packages') {
+        stage('Build & Upload Lambda Packages') {
             when {
                 expression { params.APPLY_OR_DESTROY == 'apply' }
             }
             steps {
                 script {
-                    def layers = LAYER_NAMES.split(',') 
-                    layers.each { layerName ->
-                        echo "Checking for changes in ${layerName}"
-                        // Check for changes in layer directory
-                        def hasChanges = sh(script: "git diff --quiet HEAD~1 lambda-layers/${layerName}", returnStatus: true)
-                        
-                        if (hasChanges != 0) {
-                            echo "Changes detected for ${layerName}, building and uploading..."
-                            // Build the Layer package
-                            sh "bash lambda-layers/${layerName}/build-${layerName}.sh"
-                            // Upload the built Layer package to S3
-                            sh "aws s3 cp lambda-layers/${layerName}/package.zip s3://$S3_BUCKET/lambda-layers/${layerName}/package.zip"
+                    def lambdas = LAMBDA_FUNCTIONS.split(',')
+                    lambdas.each { lambdaName ->
+                        if (sh(script: "git diff --quiet HEAD~1 lambda-functions/${lambdaName}", returnStatus: true) != 0) {
+                            echo "Changes detected for ${lambdaName}, building..."
+                            sh "bash lambda-functions/${lambdaName}/build.sh"
+                            sh "aws s3 cp lambda-functions/${lambdaName}/package.zip s3://$S3_BUCKET/lambda-packages/${lambdaName}/package.zip"
                         } else {
-                            echo "No changes detected in ${layerName}, skipping build and upload."
+                            echo "No changes in ${lambdaName}"
                         }
                     }
                 }
@@ -131,3 +119,5 @@ pipeline {
         }
     }
 }
+
+
