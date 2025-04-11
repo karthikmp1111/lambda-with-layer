@@ -39,31 +39,26 @@ pipeline {
             }
         }
 
-        stage('Build & Upload Layers') {
-            when {
-                expression { params.APPLY_OR_DESTROY == 'apply' }
-            }
-            steps {
-                script {
-                    def layers = LAYERS.split(',')
-                    layers.each { layerName ->
-                        def layerPath = "lambda-layers/${layerName}"
-                        def diffCmd = "git diff --quiet origin/main ${layerPath}"
-                        if (sh(script: diffCmd, returnStatus: true) != 0) {
-                            echo "Changes detected in ${layerName}, building and uploading..."
-                            try {
-                                sh "bash ${layerPath}/build.sh"
-                                sh "aws s3 cp ${layerPath}/layer.zip s3://${S3_BUCKET}/lambda-layers/${layerName}/layer.zip"
-                            } catch (Exception err) {
-                                error "Failed to build/upload ${layerName}: ${err}"
-                            }
-                        } else {
-                            echo "No changes in ${layerName}"
-                        }
-                    }
-                }
-            }
+stage('Build & Upload Layers') {
+  when {
+    expression { params.APPLY_OR_DESTROY == 'apply' }
+  }
+  steps {
+    script {
+      def layers = LAYERS.split(',')
+      layers.each { layerName ->
+        def diffCmd = "git diff --quiet HEAD~1 lambda-layers/${layerName}"
+        if (sh(script: diffCmd, returnStatus: true) != 0) {
+          echo "Changes detected in ${layerName}, building..."
+          sh "bash lambda-layers/${layerName}/build.sh"
+          sh "aws s3 cp lambda-layers/${layerName}/layer.zip s3://$S3_BUCKET/lambda-layers/${layerName}/layer.zip"
+        } else {
+          echo "No changes in ${layerName}"
         }
+      }
+    }
+  }
+}
 
         stage('Build & Upload Lambda Packages') {
             when {
