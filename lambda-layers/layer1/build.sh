@@ -1,16 +1,21 @@
 #!/bin/bash
-set -e
 
 echo "Building lambda-layer..."
 
+cd "$(dirname "$0")"  # ensure we’re in the correct directory
+
+# Clean up previous builds
+rm -f layer.zip
+rm -rf python
+
+# Re-create python/ and install dependencies (if any)
 mkdir -p python
 
-# Only install requirements if requirements.txt exists
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt -t python
+    pip install -r requirements.txt -t python/
 else
     echo "No requirements.txt found, skipping pip install"
 fi
 
-zip -r layer.zip python
-
+# Create the zip
+zip -r layer.zip python/
