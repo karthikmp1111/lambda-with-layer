@@ -18,7 +18,7 @@ jobs:
     environment: dev
 
     env:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_REGION: us-west-1
       S3_BUCKET: bg-kar-terraform-state
       LAMBDA_FUNCTIONS: lambda1,lambda2,lambda3
       LAYERS: layer1,layer2,layer3
@@ -34,7 +34,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Detect and build changed Lambda Layers
         if: ${{ github.event.inputs.action == 'apply' }}
