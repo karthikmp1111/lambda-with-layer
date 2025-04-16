@@ -19,6 +19,7 @@
 
 # # Create the zip
 # zip -r layer.zip python/
+
 #!/bin/bash
 set -e
 
