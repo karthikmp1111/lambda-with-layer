@@ -1,0 +1,100 @@
+name: Deploy Multi-Lambda with Layers via Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to perform'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      S3_BUCKET: bg-kar-terraform-state
+      LAMBDA_FUNCTIONS: lambda1,lambda2,lambda3
+      LAYERS: layer1,layer2,layer3
+
+    steps:
+      - name: Checkout code with full history
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Detect and build changed Lambda Layers
+        if: ${{ github.event.inputs.action == 'apply' }}
+        run: |
+          set -e
+          echo "🔍 Detecting changed Lambda Layers..."
+
+          CHANGED_FILES=$(git diff --name-only HEAD~1)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          IFS=',' read -ra LAYER_LIST <<< "$LAYERS"
+          for layer in "${LAYER_LIST[@]}"; do
+            if echo "$CHANGED_FILES" | grep -q "lambda-layers/${layer}/"; then
+              echo "📦 Changes detected in ${layer}, building and uploading..."
+              bash lambda-layers/${layer}/build.sh
+              aws s3 cp lambda-layers/${layer}/layer.zip s3://${S3_BUCKET}/lambda-layers/${layer}/layer.zip
+            else
+              echo "✅ No changes detected in ${layer}, skipping."
+            fi
+          done
+
+      - name: Detect and build changed Lambda Packages
+        if: ${{ github.event.inputs.action == 'apply' }}
+        run: |
+          set -e
+          echo "🔍 Detecting changed Lambda Functions..."
+
+          CHANGED_FILES=$(git diff --name-only HEAD~1)
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          IFS=',' read -ra LAMBDA_LIST <<< "$LAMBDA_FUNCTIONS"
+          for lambda in "${LAMBDA_LIST[@]}"; do
+            if echo "$CHANGED_FILES" | grep -q "lambda-functions/${lambda}/"; then
+              echo "📦 Changes detected in ${lambda}, building and uploading..."
+              bash lambda-functions/${lambda}/build.sh
+              aws s3 cp lambda-functions/${lambda}/package.zip s3://${S3_BUCKET}/lambda-packages/${lambda}/package.zip
+            else
+              echo "✅ No changes detected in ${lambda}, skipping."
+            fi
+          done
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: ${{ github.event.inputs.action == 'apply' }}
+        working-directory: terraform
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: ${{ github.event.inputs.action == 'destroy' }}
+        working-directory: terraform
+        run: terraform destroy -auto-approve
