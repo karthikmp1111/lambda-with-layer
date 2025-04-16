@@ -18,6 +18,7 @@ jobs:
     environment: dev
 
     env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
       S3_BUCKET: bg-kar-terraform-state
       LAMBDA_FUNCTIONS: lambda1,lambda2,lambda3
       LAYERS: layer1,layer2,layer3
@@ -28,48 +29,48 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure AWS credentials
+      - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-west-1   # ✅ hardcoded or move to GitHub secrets
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Detect and build changed Lambda Layers
+      - name: Detect and build changed Lambda layers
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           set -e
-          echo "🔍 Detecting changed Lambda Layers..."
-          CHANGED_FILES=$(git diff --name-only HEAD~1)
+          echo "🔍 Detecting changed Lambda layers..."
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           echo "$CHANGED_FILES"
 
           IFS=',' read -ra LAYER_LIST <<< "$LAYERS"
           for layer in "${LAYER_LIST[@]}"; do
             if echo "$CHANGED_FILES" | grep -q "lambda-layers/${layer}/"; then
-              echo "📦 Changes detected in ${layer}, building and uploading..."
+              echo "📦 Changes detected in layer ${layer}, building and uploading..."
               bash lambda-layers/${layer}/build.sh
               aws s3 cp lambda-layers/${layer}/layer.zip s3://${S3_BUCKET}/lambda-layers/${layer}/layer.zip
             else
-              echo "✅ No changes detected in ${layer}, skipping."
+              echo "✅ No changes in ${layer}, skipping."
             fi
           done
 
-      - name: Detect and build changed Lambda Functions
+      - name: Detect and build changed Lambda functions
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           set -e
-          echo "🔍 Detecting changed Lambda Functions..."
-          CHANGED_FILES=$(git diff --name-only HEAD~1)
+          echo "🔍 Detecting changed Lambda functions..."
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           echo "$CHANGED_FILES"
 
-          IFS=',' read -ra LAMBDA_LIST <<< "$LAMBDA_FUNCTIONS"
-          for lambda in "${LAMBDA_LIST[@]}"; do
+          IFS=',' read -ra LAMBDAS <<< "$LAMBDA_FUNCTIONS"
+          for lambda in "${LAMBDAS[@]}"; do
             if echo "$CHANGED_FILES" | grep -q "lambda-functions/${lambda}/"; then
-              echo "📦 Changes detected in ${lambda}, building and uploading..."
+              echo "📦 Changes detected for ${lambda}, building and uploading..."
               bash lambda-functions/${lambda}/build.sh
               aws s3 cp lambda-functions/${lambda}/package.zip s3://${S3_BUCKET}/lambda-packages/${lambda}/package.zip
             else
-              echo "✅ No changes detected in ${lambda}, skipping."
+              echo "✅ No changes for ${lambda}, skipping."
             fi
           done
 
