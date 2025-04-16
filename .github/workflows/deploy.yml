@@ -18,7 +18,6 @@ jobs:
     environment: dev
 
     env:
-      AWS_REGION: us-west-1
       S3_BUCKET: bg-kar-terraform-state
       LAMBDA_FUNCTIONS: lambda1,lambda2,lambda3
       LAYERS: layer1,layer2,layer3
@@ -29,21 +28,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up AWS credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-west-1   # ✅ hardcoded or move to GitHub secrets
 
       - name: Detect and build changed Lambda Layers
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           set -e
           echo "🔍 Detecting changed Lambda Layers..."
-
           CHANGED_FILES=$(git diff --name-only HEAD~1)
-          echo "Changed files:"
           echo "$CHANGED_FILES"
 
           IFS=',' read -ra LAYER_LIST <<< "$LAYERS"
@@ -57,14 +54,12 @@ jobs:
             fi
           done
 
-      - name: Detect and build changed Lambda Packages
+      - name: Detect and build changed Lambda Functions
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           set -e
           echo "🔍 Detecting changed Lambda Functions..."
-
           CHANGED_FILES=$(git diff --name-only HEAD~1)
-          echo "Changed files:"
           echo "$CHANGED_FILES"
 
           IFS=',' read -ra LAMBDA_LIST <<< "$LAMBDA_FUNCTIONS"
