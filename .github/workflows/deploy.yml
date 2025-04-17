@@ -27,7 +27,7 @@ jobs:
       - name: Checkout code with full history
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # 👈 required for full commit history
+          fetch-depth: 0
 
       - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
@@ -41,6 +41,7 @@ jobs:
         run: |
           set -e
           echo "🔍 Detecting changed Lambda layers..."
+
           git fetch origin main
           CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
           echo "$CHANGED_FILES"
@@ -61,6 +62,7 @@ jobs:
         run: |
           set -e
           echo "🔍 Detecting changed Lambda functions..."
+
           git fetch origin main
           CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
           echo "$CHANGED_FILES"
