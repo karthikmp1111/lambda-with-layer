@@ -43,6 +43,7 @@ jobs:
           set -e
           echo "🔍 Detecting changed Lambda layers..."
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
           echo "$CHANGED_FILES"
 
           IFS=',' read -ra LAYER_LIST <<< "$LAYERS"
@@ -56,12 +57,14 @@ jobs:
             fi
           done
 
-      - name: Detect and build changed Lambda functions
+      - name: Detect and build changed Lambda packages
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           set -e
           echo "🔍 Detecting changed Lambda functions..."
+
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
           echo "$CHANGED_FILES"
 
           IFS=',' read -ra LAMBDAS <<< "$LAMBDA_FUNCTIONS"
@@ -69,9 +72,9 @@ jobs:
             if echo "$CHANGED_FILES" | grep -q "lambda-functions/${lambda}/"; then
               echo "📦 Changes detected for ${lambda}, building and uploading..."
               bash lambda-functions/${lambda}/build.sh
-              aws s3 cp lambda-functions/${lambda}/package.zip s3://${S3_BUCKET}/lambda-packages/${lambda}/package.zip
+              aws s3 cp lambda-functions/${lambda}/package.zip s3://$S3_BUCKET/lambda-packages/${lambda}/package.zip
             else
-              echo "✅ No changes for ${lambda}, skipping."
+              echo "✅ No changes detected for ${lambda}, skipping."
             fi
           done
 
