@@ -42,7 +42,7 @@ jobs:
           set -e
           echo "🔍 Detecting changed Lambda layers..."
           git fetch origin main
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+          CHANGED_FILES=$(git diff --name-only $(git rev-parse HEAD~1)..HEAD)
           echo "$CHANGED_FILES"
 
           IFS=',' read -ra LAYER_LIST <<< "$LAYERS"
