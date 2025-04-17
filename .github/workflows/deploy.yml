@@ -36,23 +36,24 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Detect and build changed Lambda layers
+      - name: Detect and build changed Lambda packages
         if: ${{ github.event.inputs.action == 'apply' }}
         run: |
           set -e
           echo "🔍 Detecting changed Lambda layers..."
-          git fetch origin main
-          CHANGED_FILES=$(git diff --name-only $(git rev-parse HEAD~1)..HEAD)
+
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          IFS=',' read -ra LAYER_LIST <<< "$LAYERS"
-          for layer in "${LAYER_LIST[@]}"; do
-            if echo "$CHANGED_FILES" | grep -q "^lambda-layers/${layer}/"; then
-              echo "📦 Changes detected in layer ${layer}, building and uploading..."
-              bash lambda-layers/${layer}/build.sh
-              aws s3 cp lambda-layers/${layer}/layer.zip s3://${S3_BUCKET}/lambda-layers/${layer}/layer.zip
+          IFS=',' read -ra LAMBDAS <<< "$LAMBDA_LAYERS"
+          for lambda in "${LAMBDAS[@]}"; do
+            if echo "$CHANGED_FILES" | grep -q "lambda-layers/${lambda}/"; then
+              echo "📦 Changes detected for ${lambda}, building and uploading..."
+              bash lambda-layers/${lambda}/build.sh
+              aws s3 cp lambda-layers/${lambda}/package.zip s3://$S3_BUCKET/lambda-packages/${lambda}/package.zip
             else
-              echo "✅ No changes in ${layer}, skipping."
+              echo "✅ No changes detected for ${lambda}, skipping."
             fi
           done
 
